@@ -1,0 +1,240 @@
+{
+  "name": "Sertis Portfolio — Business Research Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "title": "Business Research Agent",
+          "subtitle": "Ask any business question — I will research and structure an answer.",
+          "allowFileUploads": false,
+          "allowedFiles": "",
+          "inputPlaceholder": "e.g. Give me background on CP Group and how Bangkok's weather might affect their retail this week."
+        }
+      },
+      "id": "chat-trigger-1",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "agent-chat-trigger"
+    },
+    {
+      "parameters": {
+        "agent": "toolsAgent",
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {
+          "systemMessage": "You are a Business Research Assistant for a Thai AI consultancy (think Sertis-style — Bangkok-based, serving retail, energy, banking, and manufacturing clients). You help analysts and managers quickly gather context on business questions.\n\n## Your Tools\n\nYou have access to two real-time tools:\n\n1. Tavily Web Search — search the live web for any topic. Returns relevant snippets with source URLs and a synthesized answer. Use this for current information, recent news, company updates, market context, or anything not covered by your training data.\n2. Bangkok Weather (Open-Meteo) — returns the current weather in Bangkok (temperature, precipitation, wind). Useful for operational planning in energy demand, retail foot traffic, and logistics.\n\n## How to Respond\n\nWhen given a business question:\n\n1. Plan — Decide whether the question needs fresh research (use Tavily), local context (use Bangkok Weather), or both.\n2. Act — Call the relevant tool(s). You may call multiple tools in parallel when independent.\n The query parameter is fully URL-escaped by n8n, so you can pass any natural-language phrase without worrying about special characters.\n3. Synthesize — Produce a structured answer with these sections. Omit any section that is not relevant.\n   - Summary — 1-2 sentence direct answer to the question.\n   - Context — Background, definitions, industry framing drawn from your research.\n   - Sources — Bullet list of URLs you actually retrieved via Tavily (only cite what you retrieved).\n   - Operational Notes — Only if relevant (e.g., how current conditions affect operations).\n   - Recommended Next Steps — 1-3 bullets for what to do with this information.\n4. Be honest — If a tool returns nothing useful, or the question is outside your scope, say so. Do not invent facts. Never cite a URL you did not actually retrieve.\n5. Language — Respond in the same language the user writes in. Default to clear, professional English if ambiguous.\n\n## Persona\n\nProfessional, concise, business-aware. You are advising a manager who has limited time. Be direct, structure your output, and avoid filler. Use clean markdown headings and bullet points.\n\n## Guardrails\n\n- Never fabricate tool outputs. If a tool returns no data, say \"I could not find X\" rather than guessing.\n- Never make up specific numbers, dates, or company facts that you have not verified through a tool or your training data.\n- For medical, legal, or financial advice, recommend consulting a qualified professional.\n- If a question requires live data you cannot access (e.g., real-time stock prices), say so and suggest an alternative source."
+        },
+        "hasOutputParser": false
+      },
+      "id": "ai-agent-1",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        560,
+        300
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "models/gemini-1.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-1.5-flash"
+        },
+        "options": {
+          "temperature": 0.2,
+          "maxOutputTokens": 2048,
+          "topP": 0.9
+        }
+      },
+      "id": "gemini-chat-1",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        360,
+        540
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": "Google Gemini API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "fromInput",
+        "contextWindowLength": 10
+      },
+      "id": "memory-1",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1,
+      "position": [
+        560,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Search the live web via Tavily for any topic and return up to 5 relevant snippets with source URLs, plus a synthesized short answer. Use this for current information, recent news, company updates, market context, or anything not covered by your training data. Pass a clear, specific natural-language query.",
+        "url": "https://api.tavily.com/search",
+        "method": "GET",
+        "sendHeaders": false,
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "PASTE_YOUR_TAVILY_KEY_HERE"
+            },
+            {
+              "name": "query",
+              "value": "={{ $fromAI('query', 'A clear, specific natural-language search query about the user topic.') }}"
+            },
+            {
+              "name": "max_results",
+              "value": "5"
+            },
+            {
+              "name": "search_depth",
+              "value": "advanced"
+            },
+            {
+              "name": "include_answer",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "tool-tavily-1",
+      "name": "Tavily Web Search",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1,
+      "position": [
+        760,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "description": "Get the current weather in Bangkok — temperature (°C), precipitation (mm), and wind speed (km/h). Use this when the question involves operational planning, energy demand, retail foot traffic, or any context where Bangkok weather matters. The tool returns live data from Open-Meteo.",
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=13.7563&longitude=100.5018&current=temperature_2m,precipitation,wind_speed_10m&timezone=Asia%2FBangkok",
+        "method": "GET",
+        "sendHeaders": false,
+        "sendQuery": false,
+        "sendBody": false,
+        "options": {
+          "timeout": 10000,
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "tool-weather-1",
+      "name": "Bangkok Weather (Open-Meteo)",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1,
+      "position": [
+        960,
+        540
+      ]
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tavily Web Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bangkok Weather (Open-Meteo)": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.1.0",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Multi-tool agent for business research — Sertis AI/ML Engineer portfolio piece. Uses Google Gemini 1.5 Flash, Tavily web search, and Open-Meteo Bangkok weather."
+  },
+  "tags": [
+    {
+      "name": "ai",
+      "id": "tag-ai"
+    },
+    {
+      "name": "agent",
+      "id": "tag-agent"
+    },
+    {
+      "name": "portfolio",
+      "id": "tag-portfolio"
+    }
+  ]
+}
