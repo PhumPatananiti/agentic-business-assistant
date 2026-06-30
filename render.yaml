@@ -5,7 +5,7 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /healthz
+    healthCheckPath: /
     autoDeploy: true
     envVars:
       - key: N8N_HOST
@@ -13,28 +13,15 @@ services:
       - key: N8N_PORT
         value: 5678
       - key: N8N_PROTOCOL
-        value: http
-      - key: WEBHOOK_URL
-        fromService:
-          type: web
-          name: agentic-business-agent
-          property: hostUrl
+        value: https
       - key: GENERIC_TIMEZONE
         value: Asia/Bangkok
       - key: N8N_SECURE_COOKIE
         value: "false"
       - key: N8N_USER_FOLDER
         value: /home/node/.n8n
-      # API keys — set these in the Render dashboard after deploy
-      # (sync: false means Render won't fail deploy if they're empty)
+      # API keys — set these in the Render dashboard after first deploy
       - key: GEMINI_API_KEY
         sync: false
       - key: TAVILY_API_KEY
-        sync: false
-      # Basic auth (recommended for public URLs — change these too)
-      - key: N8N_BASIC_AUTH_ACTIVE
-        value: "true"
-      - key: N8N_BASIC_AUTH_USER
-        value: demo
-      - key: N8N_BASIC_AUTH_PASSWORD
         sync: false
