@@ -5,7 +5,6 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /
     autoDeploy: true
     envVars:
       - key: N8N_HOST
